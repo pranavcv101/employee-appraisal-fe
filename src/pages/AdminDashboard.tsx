@@ -1,6 +1,9 @@
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
-import { addHR, AddHRResponse } from "../api/auth";
+import { addHR, listHRs, removeHR, AddHRResponse, HRItem } from "../api/auth";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("AdminDashboard");
 
 function AdminDashboard() {
   const { user, logout } = useAuth();
@@ -8,6 +11,25 @@ function AdminDashboard() {
   const [result, setResult] = useState<AddHRResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hrList, setHrList] = useState<HRItem[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  const fetchHRs = async () => {
+    try {
+      setListLoading(true);
+      const data = await listHRs();
+      setHrList(data.hr_list);
+      log.info(`Loaded ${data.hr_list.length} HR(s)`);
+    } catch (err) {
+      log.error("Failed to fetch HR list", err);
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHRs();
+  }, []);
 
   const handleAddHR = async (e: FormEvent) => {
     e.preventDefault();
@@ -19,6 +41,8 @@ function AdminDashboard() {
       const data = await addHR(hrUsername);
       setResult(data);
       setHrUsername("");
+      log.info(`HR added: ${data.username}`);
+      await fetchHRs();
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {
         const axiosErr = err as { response?: { data?: { detail?: string } } };
@@ -26,8 +50,22 @@ function AdminDashboard() {
       } else {
         setError("Failed to add HR. Please try again.");
       }
+      log.error("Failed to add HR", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRemoveHR = async (hrId: string, username: string) => {
+    if (!confirm(`Remove HR "${username}"? This cannot be undone.`)) return;
+
+    try {
+      await removeHR(hrId);
+      log.info(`HR removed: ${username}`);
+      await fetchHRs();
+    } catch (err) {
+      log.error("Failed to remove HR", err);
+      setError("Failed to remove HR.");
     }
   };
 
@@ -54,8 +92,9 @@ function AdminDashboard() {
         </button>
       </header>
 
-      <main className="container" style={{ padding: "2rem" }}>
-        <div className="card" style={{ maxWidth: "500px" }}>
+      <main className="container" style={{ padding: "2rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+        {/* Add HR Section */}
+        <div className="card" style={{ flex: "1", minWidth: "320px", maxWidth: "450px" }}>
           <h3 style={{ marginBottom: "1.5rem", fontSize: "1.25rem" }}>Add HR Employee</h3>
           <form onSubmit={handleAddHR}>
             <div className="form-group">
@@ -114,6 +153,57 @@ function AdminDashboard() {
               <p style={{ fontSize: "0.85rem", color: "var(--color-text-muted)" }}>
                 {result.message}
               </p>
+            </div>
+          )}
+        </div>
+
+        {/* HR List Section */}
+        <div className="card" style={{ flex: "1", minWidth: "320px" }}>
+          <h3 style={{ marginBottom: "1.5rem", fontSize: "1.25rem" }}>
+            HR Employees ({hrList.length})
+          </h3>
+
+          {listLoading ? (
+            <p style={{ color: "var(--color-text-muted)" }}>Loading...</p>
+          ) : hrList.length === 0 ? (
+            <p style={{ color: "var(--color-text-muted)" }}>
+              No HR employees added yet.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {hrList.map((hr) => (
+                <div
+                  key={hr.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "0.75rem 1rem",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius)",
+                  }}
+                >
+                  <div>
+                    <p style={{ fontWeight: 500 }}>{hr.username}</p>
+                    <p style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
+                      Added {new Date(hr.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    className="btn"
+                    style={{
+                      background: "#fef2f2",
+                      color: "var(--color-error)",
+                      border: "1px solid #fecaca",
+                      padding: "0.4rem 0.75rem",
+                      fontSize: "0.85rem",
+                    }}
+                    onClick={() => handleRemoveHR(hr.id, hr.username)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

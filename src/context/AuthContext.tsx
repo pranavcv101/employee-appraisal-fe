@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("AuthContext");
 
 interface User {
   username: string;
@@ -28,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
+      log.info("Session restored from storage");
     }
   }, []);
 
@@ -36,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("user", JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    log.info(`User logged in: ${newUser.username} (${newUser.role})`);
   };
 
   const logout = () => {
@@ -43,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("user");
     setToken(null);
     setUser(null);
+    log.info("User logged out");
     navigate("/signin");
   };
 

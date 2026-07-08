@@ -9,9 +9,20 @@ export interface TokenResponse {
 }
 
 export interface AddHRResponse {
+  id: string;
   username: string;
   generated_password: string;
   message: string;
+}
+
+export interface HRItem {
+  id: string;
+  username: string;
+  created_at: string;
+}
+
+export interface HRListResponse {
+  hr_list: HRItem[];
 }
 
 export async function register(
@@ -45,4 +56,13 @@ export async function addHR(username: string): Promise<AddHRResponse> {
     username,
   });
   return res.data;
+}
+
+export async function listHRs(): Promise<HRListResponse> {
+  const res = await client.get<HRListResponse>("/api/admin/hrs");
+  return res.data;
+}
+
+export async function removeHR(hrId: string): Promise<void> {
+  await client.delete(`/api/admin/hrs/${hrId}`);
 }
