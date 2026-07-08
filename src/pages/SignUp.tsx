@@ -20,6 +20,7 @@ function SignUp() {
     try {
       const data = await register(companyName, username, password);
       loginUser(data.access_token, {
+        id: data.user_id,
         username: data.username,
         role: data.role,
         company_name: data.company_name,

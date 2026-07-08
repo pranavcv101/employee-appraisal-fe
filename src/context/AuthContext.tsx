@@ -5,6 +5,7 @@ import { createLogger } from "../utils/logger";
 const log = createLogger("AuthContext");
 
 interface User {
+  id: string;
   username: string;
   role: string;
   company_name: string;

@@ -8,6 +8,8 @@ const log = createLogger("AdminDashboard");
 function AdminDashboard() {
   const { user, logout } = useAuth();
   const [hrUsername, setHrUsername] = useState("");
+  const [hrFullName, setHrFullName] = useState("");
+  const [hrDesignation, setHrDesignation] = useState("");
   const [result, setResult] = useState<AddHRResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,9 +40,11 @@ function AdminDashboard() {
     setLoading(true);
 
     try {
-      const data = await addHR(hrUsername);
+      const data = await addHR(hrUsername, hrFullName, hrDesignation);
       setResult(data);
       setHrUsername("");
+      setHrFullName("");
+      setHrDesignation("");
       log.info(`HR added: ${data.username}`);
       await fetchHRs();
     } catch (err: unknown) {
@@ -106,6 +110,26 @@ function AdminDashboard() {
                 onChange={(e) => setHrUsername(e.target.value)}
                 placeholder="Enter HR username"
                 required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="hrFullName">Full Name</label>
+              <input
+                id="hrFullName"
+                type="text"
+                value={hrFullName}
+                onChange={(e) => setHrFullName(e.target.value)}
+                placeholder="Enter full name"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="hrDesignation">Designation</label>
+              <input
+                id="hrDesignation"
+                type="text"
+                value={hrDesignation}
+                onChange={(e) => setHrDesignation(e.target.value)}
+                placeholder="Enter designation"
               />
             </div>
 
@@ -184,9 +208,14 @@ function AdminDashboard() {
                   }}
                 >
                   <div>
-                    <p style={{ fontWeight: 500 }}>{hr.username}</p>
+                    <p style={{ fontWeight: 500 }}>
+                      {hr.full_name || hr.username}
+                      <span style={{ fontSize: "0.8rem", color: "#666", marginLeft: "0.5rem" }}>
+                        ({hr.employee_id})
+                      </span>
+                    </p>
                     <p style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
-                      Added {new Date(hr.created_at).toLocaleDateString()}
+                      @{hr.username} &middot; Added {new Date(hr.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <button

@@ -3,6 +3,7 @@ import client from "./client";
 export interface TokenResponse {
   access_token: string;
   token_type: string;
+  user_id: string;
   role: string;
   username: string;
   company_name: string;
@@ -11,6 +12,7 @@ export interface TokenResponse {
 export interface AddHRResponse {
   id: string;
   username: string;
+  employee_id: string;
   generated_password: string;
   message: string;
 }
@@ -18,6 +20,8 @@ export interface AddHRResponse {
 export interface HRItem {
   id: string;
   username: string;
+  employee_id: string;
+  full_name: string;
   created_at: string;
 }
 
@@ -51,9 +55,15 @@ export async function login(
   return res.data;
 }
 
-export async function addHR(username: string): Promise<AddHRResponse> {
+export async function addHR(
+  username: string,
+  fullName: string = "",
+  designation: string = ""
+): Promise<AddHRResponse> {
   const res = await client.post<AddHRResponse>("/api/admin/add-hr", {
     username,
+    full_name: fullName,
+    designation,
   });
   return res.data;
 }

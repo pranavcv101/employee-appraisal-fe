@@ -56,14 +56,20 @@ function LandingPage() {
             A modern platform for managing employee performance reviews.
             Create your company account, add HRs, and let your team thrive.
           </p>
-          <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
             <Link to="/signup" className="btn btn-primary" style={{ padding: "1rem 2.5rem", fontSize: "1.1rem" }}>
-              Create Admin Account
+              I own a company
             </Link>
             <Link to="/signin" className="btn btn-outline" style={{ padding: "1rem 2.5rem", fontSize: "1.1rem" }}>
               Sign In
             </Link>
           </div>
+          <p style={{ marginTop: "1.5rem", color: "var(--color-text-muted)", fontSize: "0.95rem" }}>
+            HR or employee?{" "}
+            <Link to="/signin" style={{ color: "var(--color-primary)" }}>
+              Choose your sign-in type
+            </Link>
+          </p>
         </div>
       </main>
 

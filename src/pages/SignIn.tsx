@@ -1,9 +1,16 @@
 import { useState, FormEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useParams, Navigate } from "react-router-dom";
 import { login } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import {
+  isValidPortal,
+  PORTAL_CONFIG,
+  roleMatchesPortal,
+  type LoginPortal,
+} from "../utils/authRouting";
 
 function SignIn() {
+  const { portal: portalParam } = useParams<{ portal: string }>();
   const [companyName, setCompanyName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -12,6 +19,13 @@ function SignIn() {
   const navigate = useNavigate();
   const { loginUser } = useAuth();
 
+  if (!isValidPortal(portalParam)) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  const portal: LoginPortal = portalParam;
+  const config = PORTAL_CONFIG[portal];
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -19,17 +33,24 @@ function SignIn() {
 
     try {
       const data = await login(companyName, username, password);
+
+      if (!roleMatchesPortal(data.role, portal)) {
+        const portalLabel =
+          portal === "admin" ? "company owner" : portal === "hr" ? "HR" : "employee";
+        setError(
+          `This account is not registered as ${portalLabel}. Please choose the correct sign-in option.`
+        );
+        return;
+      }
+
       loginUser(data.access_token, {
+        id: data.user_id,
         username: data.username,
         role: data.role,
         company_name: data.company_name,
       });
 
-      if (data.role === "admin") {
-        navigate("/admin");
-      } else if (data.role === "hr") {
-        navigate("/hr");
-      }
+      navigate(config.dashboard);
     } catch (err: unknown) {
       if (err && typeof err === "object" && "response" in err) {
         const axiosErr = err as { response?: { data?: { detail?: string } } };
@@ -53,9 +74,22 @@ function SignIn() {
       }}
     >
       <div className="card" style={{ width: "100%", maxWidth: "450px" }}>
-        <h2 style={{ marginBottom: "0.5rem", fontSize: "1.75rem" }}>Sign In</h2>
+        <Link
+          to="/signin"
+          style={{
+            display: "inline-block",
+            marginBottom: "1rem",
+            color: "var(--color-text-muted)",
+            textDecoration: "none",
+            fontSize: "0.9rem",
+          }}
+        >
+          &larr; Change sign-in type
+        </Link>
+
+        <h2 style={{ marginBottom: "0.5rem", fontSize: "1.75rem" }}>{config.title}</h2>
         <p style={{ color: "var(--color-text-muted)", marginBottom: "2rem" }}>
-          Enter your company name and credentials
+          {config.subtitle}
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -107,12 +141,20 @@ function SignIn() {
           </button>
         </form>
 
-        <p style={{ marginTop: "1.5rem", textAlign: "center", color: "var(--color-text-muted)" }}>
-          Don't have an account?{" "}
-          <Link to="/signup" style={{ color: "var(--color-primary)" }}>
-            Create one
-          </Link>
-        </p>
+        {portal === "admin" && (
+          <p
+            style={{
+              marginTop: "1.5rem",
+              textAlign: "center",
+              color: "var(--color-text-muted)",
+            }}
+          >
+            Don't have a company account?{" "}
+            <Link to="/signup" style={{ color: "var(--color-primary)" }}>
+              Create one
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
