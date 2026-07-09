@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from "recharts";
 import { useAuth } from "../context/AuthContext";
 import {
   listCycles,
@@ -12,17 +16,44 @@ import {
   addEmployee,
   getEmployeeDetail,
   removeEmployee,
+  getParticipantAppraisalDetails,
   Cycle,
   Participant,
   EmployeeItem,
   EmployeeDetailResponse,
   AddEmployeeResponse,
 } from "../api/cycles";
+import { AppraisalDetails } from "../api/employee";
+import { getHRStats, HRStats } from "../api/dashboard";
+import StatCard from "../components/dashboard/StatCard";
 import { createLogger } from "../utils/logger";
 
 const log = createLogger("hr-dashboard");
 
-type Tab = "cycles" | "employees";
+type Tab = "overview" | "cycles" | "employees";
+
+const CHART_COLORS = {
+  primary: "#2563eb",
+  success: "#16a34a",
+  warning: "#d97706",
+  purple: "#8b5cf6",
+  cyan: "#06b6d4",
+  rose: "#e11d48",
+  amber: "#f59e0b",
+  emerald: "#10b981",
+  indigo: "#6366f1",
+};
+
+const PIE_COLORS = ["#2563eb", "#16a34a", "#d97706", "#8b5cf6", "#06b6d4", "#e11d48", "#f59e0b", "#10b981", "#6366f1", "#94a3b8"];
+
+const STATUS_COLORS: Record<string, string> = {
+  pending_self_appraisal: "#f59e0b",
+  self_appraisal_submitted: "#06b6d4",
+  lead_reviewing: "#2563eb",
+  lead_reviewed: "#10b981",
+  meeting_scheduled: "#8b5cf6",
+  completed: "#16a34a",
+};
 
 const statusLabels: Record<string, string> = {
   pending_self_appraisal: "Pending Self Appraisal",
@@ -36,7 +67,8 @@ const statusLabels: Record<string, string> = {
 
 function HRDashboard() {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("cycles");
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [hrStats, setHRStats] = useState<HRStats | null>(null);
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [employees, setEmployees] = useState<EmployeeItem[]>([]);
   const [selectedCycle, setSelectedCycle] = useState<Cycle | null>(null);
@@ -65,10 +97,22 @@ function HRDashboard() {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetailResponse | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [viewFormData, setViewFormData] = useState<AppraisalDetails | null>(null);
+  const [loadingForm, setLoadingForm] = useState(false);
+
+  async function loadHRStats() {
+    try {
+      const data = await getHRStats();
+      setHRStats(data);
+    } catch (err) {
+      log.error("Failed to load HR stats", err);
+    }
+  }
 
   useEffect(() => {
     loadCycles();
     loadEmployees();
+    loadHRStats();
   }, []);
 
   async function loadCycles() {
@@ -210,6 +254,19 @@ function HRDashboard() {
     }
   }
 
+  async function handleViewForm(participantId: string) {
+    setLoadingForm(true);
+    try {
+      const data = await getParticipantAppraisalDetails(participantId);
+      setViewFormData(data);
+    } catch (err) {
+      log.error("Failed to load appraisal form", err);
+      setError("Failed to load appraisal form");
+    } finally {
+      setLoadingForm(false);
+    }
+  }
+
   async function handleRemoveEmployee(empId: string) {
     setError("");
     try {
@@ -243,20 +300,17 @@ function HRDashboard() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          borderBottom: "1px solid #ddd",
-          background: "#fff",
+          borderBottom: "1px solid var(--color-border)",
+          background: "var(--color-surface)",
         }}
       >
         <div>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>HR Dashboard</h1>
-          <p style={{ fontSize: "0.875rem", color: "#666", margin: 0 }}>
+          <p style={{ fontSize: "0.875rem", color: "var(--color-text-muted)", margin: 0 }}>
             {user?.company_name} - {user?.username}
           </p>
         </div>
-        <button
-          onClick={logout}
-          style={{ padding: "0.5rem 1rem", background: "#e74c3c", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}
-        >
+        <button className="btn btn-outline" onClick={logout}>
           Logout
         </button>
       </header>
@@ -265,27 +319,30 @@ function HRDashboard() {
         style={{
           display: "flex",
           gap: "0",
-          borderBottom: "1px solid #ddd",
-          background: "#fff",
+          borderBottom: "1px solid var(--color-border)",
+          background: "var(--color-surface)",
           padding: "0 2rem",
         }}
       >
-        {(["cycles", "employees"] as Tab[]).map((tab) => (
+        {([
+          { key: "overview" as Tab, label: "Overview" },
+          { key: "cycles" as Tab, label: "Appraisal Cycles" },
+          { key: "employees" as Tab, label: "Employees" },
+        ]).map(({ key, label }) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={key}
+            onClick={() => setActiveTab(key)}
             style={{
               padding: "0.75rem 1.5rem",
               border: "none",
               background: "none",
-              borderBottom: activeTab === tab ? "2px solid #007bff" : "2px solid transparent",
-              color: activeTab === tab ? "#007bff" : "#666",
-              fontWeight: activeTab === tab ? 600 : 400,
+              borderBottom: activeTab === key ? "2px solid var(--color-primary)" : "2px solid transparent",
+              color: activeTab === key ? "var(--color-primary)" : "var(--color-text-muted)",
+              fontWeight: activeTab === key ? 600 : 400,
               cursor: "pointer",
-              textTransform: "capitalize",
             }}
           >
-            {tab === "cycles" ? "Appraisal Cycles" : "Employees"}
+            {label}
           </button>
         ))}
       </nav>
@@ -297,6 +354,265 @@ function HRDashboard() {
             <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", cursor: "pointer" }}>
               &times;
             </button>
+          </div>
+        )}
+
+        {activeTab === "overview" && hrStats && (
+          <div>
+            {/* Stat Cards */}
+            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "2rem" }}>
+              <StatCard
+                label="Total Employees"
+                value={hrStats.headcount.total_employees}
+                subtitle="All company members"
+                color={CHART_COLORS.primary}
+              />
+              <StatCard
+                label="Active Cycles"
+                value={hrStats.headcount.active_cycles}
+                subtitle="In progress"
+                color={CHART_COLORS.success}
+              />
+              <StatCard
+                label="Completion Rate"
+                value={
+                  hrStats.completion_rate.length > 0
+                    ? `${hrStats.completion_rate[0].percentage}%`
+                    : "N/A"
+                }
+                subtitle={
+                  hrStats.completion_rate.length > 0
+                    ? `${hrStats.completion_rate[0].completed_count}/${hrStats.completion_rate[0].total_count} in ${hrStats.completion_rate[0].cycle_name}`
+                    : "No cycles yet"
+                }
+                color={CHART_COLORS.purple}
+              />
+            </div>
+
+            {/* Cycle Progress + Avg Ratings */}
+            <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginBottom: "2rem" }}>
+              {hrStats.active_cycle_progress.length > 0 && (
+                <div className="card" style={{ flex: "1", minWidth: "400px" }}>
+                  <h3 style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                    Cycle Progress
+                  </h3>
+                  {hrStats.active_cycle_progress.map((cycle) => {
+                    const chartData = cycle.status_breakdown.map((s) => ({
+                      name: s.status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+                      value: s.count,
+                      status: s.status,
+                    }));
+                    return (
+                      <div key={cycle.cycle_name} style={{ marginBottom: "1.5rem" }}>
+                        <p style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
+                          {cycle.cycle_name}
+                          <span style={{ fontWeight: 400, color: "var(--color-text-muted)", marginLeft: "0.5rem" }}>
+                            ({cycle.total_participants} participants)
+                          </span>
+                        </p>
+                        <ResponsiveContainer width="100%" height={40}>
+                          <BarChart
+                            data={[chartData.reduce((acc, item) => ({ ...acc, [item.status]: item.value }), {} as Record<string, number>)]}
+                            layout="horizontal"
+                            barSize={28}
+                          >
+                            {chartData.map((item) => (
+                              <Bar
+                                key={item.status}
+                                dataKey={item.status}
+                                stackId="a"
+                                fill={STATUS_COLORS[item.status] || "#94a3b8"}
+                                name={item.name}
+                              />
+                            ))}
+                            <Tooltip />
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.5rem" }}>
+                          {chartData.map((item) => (
+                            <div key={item.status} style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.75rem" }}>
+                              <div style={{ width: 10, height: 10, borderRadius: 2, background: STATUS_COLORS[item.status] || "#94a3b8" }} />
+                              <span>{item.name}: {item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {hrStats.avg_ratings_by_category.length > 0 && (
+                <div className="card" style={{ flex: "1", minWidth: "400px" }}>
+                  <h3 style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                    Average Ratings by Category
+                  </h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={hrStats.avg_ratings_by_category}
+                      layout="vertical"
+                      margin={{ left: 30, right: 20, top: 5, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis type="number" domain={[0, 10]} />
+                      <YAxis
+                        dataKey="category"
+                        type="category"
+                        width={180}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip formatter={(v: number) => v.toFixed(1)} />
+                      <Bar dataKey="avg_rating" fill={CHART_COLORS.primary} radius={[0, 4, 4, 0]} name="Avg Rating" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+
+            {/* Top Performers + Upcoming Meetings */}
+            <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginBottom: "2rem" }}>
+              {hrStats.top_performers.length > 0 && (
+                <div className="card" style={{ flex: "1", minWidth: "350px" }}>
+                  <h3 style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                    Top Performers
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    {hrStats.top_performers.map((tp, i) => (
+                      <div
+                        key={tp.employee_id}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: "0.6rem 0.75rem",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "var(--radius)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 28,
+                              height: 28,
+                              borderRadius: "50%",
+                              background: i === 0 ? "#fef3c7" : i === 1 ? "#f3f4f6" : i === 2 ? "#fed7aa" : "#f1f5f9",
+                              color: i === 0 ? "#92400e" : i === 1 ? "#374151" : i === 2 ? "#9a3412" : "#64748b",
+                              fontSize: "0.8rem",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {i + 1}
+                          </span>
+                          <div>
+                            <p style={{ fontWeight: 500, fontSize: "0.9rem" }}>{tp.employee_name}</p>
+                            <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>{tp.designation}</p>
+                          </div>
+                        </div>
+                        <span style={{ fontWeight: 700, color: CHART_COLORS.primary, fontSize: "1rem" }}>
+                          {tp.avg_rating.toFixed(1)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="card" style={{ flex: "1", minWidth: "350px" }}>
+                <h3 style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                  Upcoming Meetings
+                </h3>
+                {hrStats.upcoming_meetings.length === 0 ? (
+                  <p style={{ color: "var(--color-text-muted)", fontSize: "0.9rem" }}>No upcoming meetings scheduled.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    {hrStats.upcoming_meetings.map((m) => (
+                      <div
+                        key={m.participant_id}
+                        style={{
+                          padding: "0.6rem 0.75rem",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "var(--radius)",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <p style={{ fontWeight: 500, fontSize: "0.9rem" }}>{m.employee_name}</p>
+                          <span style={{ fontSize: "0.8rem", color: CHART_COLORS.purple, fontWeight: 500 }}>
+                            {new Date(m.meeting_time).toLocaleString()}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: "0.15rem" }}>
+                          {m.cycle_name}
+                          {m.lead_name && ` · Lead: ${m.lead_name}`}
+                          {m.hr_name && ` · HR: ${m.hr_name}`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Distribution Charts */}
+            <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginBottom: "2rem" }}>
+              {hrStats.designation_distribution.length > 0 && (
+                <div className="card" style={{ flex: "1", minWidth: "350px" }}>
+                  <h3 style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                    Designation Distribution
+                  </h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={hrStats.designation_distribution.map((d) => ({ name: d.designation, value: d.count }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={3}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        labelLine={false}
+                      >
+                        {hrStats.designation_distribution.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {hrStats.skillset_distribution.length > 0 && (
+                <div className="card" style={{ flex: "1", minWidth: "350px" }}>
+                  <h3 style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                    Skillset Distribution
+                  </h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={hrStats.skillset_distribution.map((s) => ({ name: s.skillset, value: s.count }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={3}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name.substring(0, 20)}${name.length > 20 ? "..." : ""} (${(percent * 100).toFixed(0)}%)`}
+                        labelLine={false}
+                      >
+                        {hrStats.skillset_distribution.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -768,6 +1084,14 @@ function HRDashboard() {
                                 Schedule Meeting
                               </button>
                             )}
+                            {p.status === "completed" && (
+                              <button
+                                onClick={() => handleViewForm(p.id)}
+                                style={{ padding: "0.3rem 0.75rem", background: "#17a2b8", color: "#fff", border: "none", borderRadius: 3, cursor: "pointer", fontSize: "0.8rem" }}
+                              >
+                                View Full Form
+                              </button>
+                            )}
                             {p.meeting_time && (
                               <span style={{ fontSize: "0.8rem", color: "#333" }}>
                                 Meeting: {new Date(p.meeting_time).toLocaleString()}
@@ -785,6 +1109,108 @@ function HRDashboard() {
                   <p>Create a new cycle, add employees for their appraisal, then start the cycle.</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* View Filled Form Modal */}
+        {(viewFormData || loadingForm) && (
+          <div
+            style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) setViewFormData(null); }}
+          >
+            <div style={{ background: "#fff", borderRadius: 10, width: 750, maxHeight: "85vh", overflow: "auto", padding: "2rem" }}>
+              {loadingForm ? (
+                <p style={{ textAlign: "center", padding: "2rem" }}>Loading form...</p>
+              ) : viewFormData ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+                    <div>
+                      <h2 style={{ margin: 0 }}>Appraisal Form</h2>
+                      <p style={{ margin: "0.25rem 0 0", color: "#666" }}>
+                        {viewFormData.employee_name} ({viewFormData.employee_code}) &middot; {viewFormData.cycle_name}
+                      </p>
+                    </div>
+                    <button onClick={() => setViewFormData(null)} style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#666" }}>&times;</button>
+                  </div>
+
+                  {viewFormData.self_appraisal && (
+                    <div style={{ marginBottom: "1.5rem" }}>
+                      <h3 style={{ borderBottom: "2px solid #007bff", paddingBottom: "0.5rem" }}>Section 1: Self Appraisal</h3>
+                      {Object.entries(viewFormData.self_appraisal).filter(([k]) => k !== "submitted_at").map(([key, value]) => (
+                        <div key={key} style={{ marginBottom: "0.75rem" }}>
+                          <label style={{ display: "block", fontSize: "0.8rem", color: "#666", textTransform: "capitalize" }}>{key.replace(/_/g, " ")}</label>
+                          <p style={{ margin: "0.25rem 0 0", background: "#f8f9fa", padding: "0.5rem", borderRadius: 4, whiteSpace: "pre-wrap" }}>{value || "—"}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {viewFormData.performance_ratings && viewFormData.performance_ratings.length > 0 && (
+                    <div style={{ marginBottom: "1.5rem" }}>
+                      <h3 style={{ borderBottom: "2px solid #28a745", paddingBottom: "0.5rem" }}>Section 2: Performance Ratings</h3>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                        <thead>
+                          <tr style={{ background: "#f8f9fa" }}>
+                            <th style={{ padding: "0.5rem", textAlign: "left", border: "1px solid #dee2e6" }}>Category</th>
+                            <th style={{ padding: "0.5rem", textAlign: "left", border: "1px solid #dee2e6" }}>Item</th>
+                            <th style={{ padding: "0.5rem", textAlign: "center", border: "1px solid #dee2e6" }}>Rating</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewFormData.performance_ratings.map((r, i) => (
+                            <tr key={i}>
+                              <td style={{ padding: "0.4rem 0.5rem", border: "1px solid #dee2e6", textTransform: "capitalize" }}>{r.category}</td>
+                              <td style={{ padding: "0.4rem 0.5rem", border: "1px solid #dee2e6" }}>{r.item}</td>
+                              <td style={{ padding: "0.4rem 0.5rem", border: "1px solid #dee2e6", textAlign: "center", fontWeight: 600 }}>{r.rating}/10</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {viewFormData.development_plans && viewFormData.development_plans.length > 0 && (
+                    <div style={{ marginBottom: "1.5rem" }}>
+                      <h3 style={{ borderBottom: "2px solid #6f42c1", paddingBottom: "0.5rem" }}>Section 3: Individual Development Plan</h3>
+                      {viewFormData.development_plans.map((dp, i) => (
+                        <div key={i} style={{ marginBottom: "0.75rem", border: "1px solid #eee", borderRadius: 6, padding: "0.75rem" }}>
+                          <strong style={{ textTransform: "capitalize", color: "#6f42c1" }}>{dp.category}</strong>
+                          <p style={{ margin: "0.25rem 0", fontSize: "0.85rem" }}><strong>Objectives:</strong> {dp.individual_objectives}</p>
+                          <p style={{ margin: "0.25rem 0", fontSize: "0.85rem" }}><strong>Plan:</strong> {dp.development_plan}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {viewFormData.additional_remarks && (
+                    <div>
+                      <h3 style={{ borderBottom: "2px solid #fd7e14", paddingBottom: "0.5rem" }}>Section 4: Additional Remarks</h3>
+                      {viewFormData.additional_remarks.appraisee_remarks && (
+                        <div style={{ marginBottom: "0.75rem" }}>
+                          <label style={{ fontSize: "0.8rem", color: "#666" }}>Appraisee Remarks</label>
+                          <p style={{ margin: "0.25rem 0 0", background: "#f8f9fa", padding: "0.5rem", borderRadius: 4 }}>{viewFormData.additional_remarks.appraisee_remarks}</p>
+                        </div>
+                      )}
+                      {viewFormData.additional_remarks.appraiser_remarks && (
+                        <div style={{ marginBottom: "0.75rem" }}>
+                          <label style={{ fontSize: "0.8rem", color: "#666" }}>Appraiser Remarks</label>
+                          <p style={{ margin: "0.25rem 0 0", background: "#f8f9fa", padding: "0.5rem", borderRadius: 4 }}>{viewFormData.additional_remarks.appraiser_remarks}</p>
+                        </div>
+                      )}
+                      {viewFormData.additional_remarks.special_mentions && (
+                        <div>
+                          <label style={{ fontSize: "0.8rem", color: "#666" }}>Special Mentions</label>
+                          <p style={{ margin: "0.25rem 0 0", background: "#f8f9fa", padding: "0.5rem", borderRadius: 4 }}>{viewFormData.additional_remarks.special_mentions}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : null}
             </div>
           </div>
         )}

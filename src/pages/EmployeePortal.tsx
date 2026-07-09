@@ -1,21 +1,23 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { createLogger } from "../utils/logger";
+import DashboardTab from "../components/employee/DashboardTab";
 import SelfAppraisalTab from "../components/employee/SelfAppraisalTab";
 import ReviewsTab from "../components/employee/ReviewsTab";
 import MeetingsTab from "../components/employee/MeetingsTab";
 
 const log = createLogger("employee-portal");
 
-type Tab = "self-appraisal" | "reviews" | "meetings";
+type Tab = "dashboard" | "self-appraisal" | "reviews" | "meetings";
 
 export default function EmployeePortal() {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("self-appraisal");
+  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
   log.info("Employee portal loaded");
 
   const tabs: { key: Tab; label: string }[] = [
+    { key: "dashboard", label: "My Dashboard" },
     { key: "self-appraisal", label: "Self Appraisal" },
     { key: "reviews", label: "Reviews" },
     { key: "meetings", label: "Meetings" },
@@ -80,6 +82,7 @@ export default function EmployeePortal() {
       </aside>
 
       <main style={{ flex: 1, padding: "2rem", backgroundColor: "#f5f5f5" }}>
+        {activeTab === "dashboard" && <DashboardTab />}
         {activeTab === "self-appraisal" && <SelfAppraisalTab />}
         {activeTab === "reviews" && <ReviewsTab />}
         {activeTab === "meetings" && <MeetingsTab />}

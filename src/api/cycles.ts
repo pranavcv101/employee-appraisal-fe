@@ -155,3 +155,8 @@ export async function removeEmployee(employeeId: string): Promise<{ message: str
   const res = await client.delete(`/api/hr/employees/${employeeId}`);
   return res.data;
 }
+
+export async function getParticipantAppraisalDetails(participantId: string) {
+  const res = await client.get(`/api/employee/my-appraisals/${participantId}`);
+  return res.data;
+}

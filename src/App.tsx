@@ -19,7 +19,11 @@ function ProtectedRoute({
   children: React.ReactNode;
   allowedRoles: string[];
 }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/signin" replace />;

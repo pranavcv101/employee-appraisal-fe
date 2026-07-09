@@ -66,7 +66,10 @@ export interface MeetingItem {
   cycle_name: string;
   employee_name: string;
   employee_code: string;
+  lead_id: string | null;
   lead_name: string | null;
+  assigned_hr_id: string | null;
+  hr_name: string | null;
   meeting_time: string;
   status: string;
 }

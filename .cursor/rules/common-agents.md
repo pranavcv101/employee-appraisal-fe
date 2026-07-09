@@ -6,7 +6,7 @@ alwaysApply: true
 
 ## Available Agents
 
-Located in `~/.claude/agents/`:
+Located in `.cursor/agents/` (prefixed as `ecc-*.md`):
 
 | Agent | Purpose | When to Use |
 |-------|---------|-------------|

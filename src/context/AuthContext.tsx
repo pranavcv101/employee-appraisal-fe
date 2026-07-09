@@ -17,23 +17,36 @@ interface AuthContextType {
   loginUser: (token: string, user: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getStoredAuth(): { token: string | null; user: User | null } {
+  const token = localStorage.getItem("token");
+  const userStr = localStorage.getItem("user");
+  if (token && userStr) {
+    try {
+      return { token, user: JSON.parse(userStr) };
+    } catch {
+      return { token: null, user: null };
+    }
+  }
+  return { token: null, user: null };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const stored = getStoredAuth();
+  const [user, setUser] = useState<User | null>(stored.user);
+  const [token, setToken] = useState<string | null>(stored.token);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+    if (stored.token) {
       log.info("Session restored from storage");
     }
+    setIsLoading(false);
   }, []);
 
   const loginUser = (newToken: string, newUser: User) => {
@@ -55,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loginUser, logout, isAuthenticated: !!token }}
+      value={{ user, token, loginUser, logout, isAuthenticated: !!token, isLoading }}
     >
       {children}
     </AuthContext.Provider>
