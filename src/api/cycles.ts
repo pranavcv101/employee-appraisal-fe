@@ -121,3 +121,37 @@ export async function addEmployee(data: {
   const res = await client.post<AddEmployeeResponse>("/api/hr/employees", data);
   return res.data;
 }
+
+export interface AppraisalHistoryItem {
+  participant_id: string;
+  cycle_id: string;
+  cycle_name: string;
+  period_from: string;
+  period_to: string;
+  cycle_status: string;
+  participant_status: string;
+  meeting_time: string | null;
+}
+
+export interface EmployeeDetailResponse {
+  id: string;
+  username: string;
+  employee_id: string;
+  full_name: string;
+  designation: string;
+  role: string;
+  date_of_joining: string | null;
+  skillset: string | null;
+  created_at: string;
+  appraisal_history: AppraisalHistoryItem[];
+}
+
+export async function getEmployeeDetail(employeeId: string): Promise<EmployeeDetailResponse> {
+  const res = await client.get<EmployeeDetailResponse>(`/api/hr/employees/${employeeId}`);
+  return res.data;
+}
+
+export async function removeEmployee(employeeId: string): Promise<{ message: string }> {
+  const res = await client.delete(`/api/hr/employees/${employeeId}`);
+  return res.data;
+}

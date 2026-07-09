@@ -10,9 +10,12 @@ import {
   scheduleMeeting,
   listEmployees,
   addEmployee,
+  getEmployeeDetail,
+  removeEmployee,
   Cycle,
   Participant,
   EmployeeItem,
+  EmployeeDetailResponse,
   AddEmployeeResponse,
 } from "../api/cycles";
 import { createLogger } from "../utils/logger";
@@ -59,6 +62,9 @@ function HRDashboard() {
   });
   const [addedEmployeeResult, setAddedEmployeeResult] = useState<AddEmployeeResponse | null>(null);
   const [addingEmployee, setAddingEmployee] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeDetailResponse | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   useEffect(() => {
     loadCycles();
@@ -188,6 +194,32 @@ function HRDashboard() {
       setError(err.response?.data?.detail || "Failed to add employee");
     } finally {
       setAddingEmployee(false);
+    }
+  }
+
+  async function handleViewEmployee(empId: string) {
+    setLoadingDetail(true);
+    try {
+      const detail = await getEmployeeDetail(empId);
+      setSelectedEmployee(detail);
+    } catch (err) {
+      log.error("Failed to load employee detail", err);
+      setError("Failed to load employee details");
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
+
+  async function handleRemoveEmployee(empId: string) {
+    setError("");
+    try {
+      await removeEmployee(empId);
+      setSelectedEmployee(null);
+      setConfirmRemove(null);
+      await loadEmployees();
+      log.info("Employee removed: %s", empId);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to remove employee");
     }
   }
 
@@ -373,7 +405,20 @@ function HRDashboard() {
                 {companyEmployees.map((emp) => (
                   <div
                     key={emp.id}
-                    style={{ background: "#fff", padding: "1rem", borderRadius: 6, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", display: "flex", justifyContent: "space-between" }}
+                    onClick={() => handleViewEmployee(emp.id)}
+                    style={{
+                      background: "#fff",
+                      padding: "1rem",
+                      borderRadius: 6,
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      cursor: "pointer",
+                      transition: "box-shadow 0.15s",
+                      border: "1px solid #eee",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)")}
                   >
                     <div>
                       <strong>{emp.full_name || emp.username}</strong>
@@ -389,6 +434,135 @@ function HRDashboard() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Employee Detail Modal */}
+        {(selectedEmployee || loadingDetail) && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) { setSelectedEmployee(null); setConfirmRemove(null); } }}
+          >
+            <div style={{ background: "#fff", borderRadius: 10, width: 650, maxHeight: "85vh", overflow: "auto", padding: "2rem" }}>
+              {loadingDetail ? (
+                <p style={{ textAlign: "center", padding: "2rem" }}>Loading employee details...</p>
+              ) : selectedEmployee ? (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+                    <div>
+                      <h2 style={{ margin: 0 }}>{selectedEmployee.full_name}</h2>
+                      <p style={{ margin: "0.25rem 0 0", color: "#666" }}>
+                        {selectedEmployee.designation} &middot; {selectedEmployee.employee_id} &middot; @{selectedEmployee.username}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedEmployee(null); setConfirmRemove(null); }}
+                      style={{ background: "none", border: "none", fontSize: "1.5rem", cursor: "pointer", color: "#666" }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
+                    <div style={{ background: "#f8f9fa", padding: "0.75rem", borderRadius: 6 }}>
+                      <span style={{ fontSize: "0.8rem", color: "#666" }}>Role</span>
+                      <p style={{ margin: "0.25rem 0 0", fontWeight: 500, textTransform: "capitalize" }}>{selectedEmployee.role}</p>
+                    </div>
+                    <div style={{ background: "#f8f9fa", padding: "0.75rem", borderRadius: 6 }}>
+                      <span style={{ fontSize: "0.8rem", color: "#666" }}>Date of Joining</span>
+                      <p style={{ margin: "0.25rem 0 0", fontWeight: 500 }}>{selectedEmployee.date_of_joining ? new Date(selectedEmployee.date_of_joining).toLocaleDateString() : "N/A"}</p>
+                    </div>
+                    <div style={{ background: "#f8f9fa", padding: "0.75rem", borderRadius: 6, gridColumn: "1 / -1" }}>
+                      <span style={{ fontSize: "0.8rem", color: "#666" }}>Skillset</span>
+                      <p style={{ margin: "0.25rem 0 0", fontWeight: 500 }}>{selectedEmployee.skillset || "N/A"}</p>
+                    </div>
+                  </div>
+
+                  <h3 style={{ borderBottom: "1px solid #eee", paddingBottom: "0.5rem" }}>Appraisal History</h3>
+                  {selectedEmployee.appraisal_history.length === 0 ? (
+                    <p style={{ color: "#666", fontSize: "0.9rem" }}>No appraisal cycles found for this employee.</p>
+                  ) : (
+                    <div style={{ display: "grid", gap: "0.75rem" }}>
+                      {selectedEmployee.appraisal_history.map((h) => (
+                        <div key={h.participant_id} style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <strong style={{ fontSize: "0.9rem" }}>{h.cycle_name}</strong>
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                padding: "0.15rem 0.5rem",
+                                borderRadius: 8,
+                                background: h.participant_status === "completed" ? "#d4edda" : "#fff3cd",
+                                color: h.participant_status === "completed" ? "#155724" : "#856404",
+                              }}
+                            >
+                              {statusLabels[h.participant_status] || h.participant_status}
+                            </span>
+                          </div>
+                          <p style={{ margin: "0.25rem 0 0", fontSize: "0.8rem", color: "#666" }}>
+                            {h.period_from} to {h.period_to}
+                            {h.meeting_time && ` • Meeting: ${new Date(h.meeting_time).toLocaleString()}`}
+                          </p>
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              padding: "0.1rem 0.4rem",
+                              borderRadius: 4,
+                              background: h.cycle_status === "completed" ? "#cce5ff" : h.cycle_status === "active" ? "#d4edda" : "#fff3cd",
+                              color: h.cycle_status === "completed" ? "#004085" : h.cycle_status === "active" ? "#155724" : "#856404",
+                              marginTop: "0.25rem",
+                              display: "inline-block",
+                            }}
+                          >
+                            Cycle: {h.cycle_status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ borderTop: "1px solid #eee", marginTop: "1.5rem", paddingTop: "1rem" }}>
+                    {confirmRemove === selectedEmployee.id ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <span style={{ color: "#dc3545", fontSize: "0.9rem", fontWeight: 500 }}>
+                          Are you sure? This cannot be undone.
+                        </span>
+                        <button
+                          onClick={() => handleRemoveEmployee(selectedEmployee.id)}
+                          style={{ padding: "0.4rem 1rem", background: "#dc3545", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.85rem" }}
+                        >
+                          Confirm Remove
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemove(null)}
+                          style={{ padding: "0.4rem 1rem", background: "#6c757d", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.85rem" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmRemove(selectedEmployee.id)}
+                        style={{ padding: "0.4rem 1rem", background: "#dc3545", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.85rem" }}
+                      >
+                        Remove Employee
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
           </div>
         )}
 
