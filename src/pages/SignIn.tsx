@@ -106,13 +106,19 @@ function SignIn() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username">
+              {portal === "employee" ? "Username or Employee ID" : "Username"}
+            </label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Your username"
+              placeholder={
+                portal === "employee"
+                  ? "Enter your username or employee id"
+                  : "Your username"
+              }
               required
             />
           </div>
